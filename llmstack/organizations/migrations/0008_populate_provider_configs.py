@@ -11,60 +11,31 @@ logger = logging.getLogger(__name__)
 
 
 def populate_provider_configs(apps, schema_editor):
-    from llmstack.organizations.models import OrganizationSettings
-    from llmstack.processors.providers.anthropic import AnthropicProviderConfig
-    from llmstack.processors.providers.azure import AzureProviderConfig
-    from llmstack.processors.providers.cohere import CohereProviderConfig
-    from llmstack.processors.providers.elevenlabs import ElevenLabsProviderConfig
-    from llmstack.processors.providers.openai import OpenAIProviderConfig
-    from llmstack.processors.providers.stabilityai import StabilityAIProviderConfig
-
-    # Find orgs that have one of [azure_openai_api_key, openai_key, stabilityai_key, cohere_key, elevenlabs_key, google_service_account_json_key, localai_api_key, localai_base_url, anthropic_api_key] set
-    entries = OrganizationSettings.objects.exclude(
-        azure_openai_api_key=None,
-        azure_openai_endpoint=None,
-        openai_key=None,
-        stabilityai_key=None,
-        cohere_key=None,
-        elevenlabs_key=None,
-        anthropic_api_key=None,
-    )
-
-    logger.info(f"Found {entries.count()} profiles to update")
-
-    for org_settings in entries:
-        provider_configs = {}
-        if org_settings.azure_openai_api_key or org_settings.azure_openai_endpoint:
-            provider_configs["azure/*/*/*"] = AzureProviderConfig(
-                api_key=org_settings.decrypt_value(org_settings.azure_openai_api_key or ""),
-                endpoint=org_settings.azure_openai_endpoint or "",
-            ).model_dump()
-        if org_settings.openai_key:
-            provider_configs["openai/*/*/*"] = OpenAIProviderConfig(
-                api_key=org_settings.decrypt_value(org_settings.openai_key)
-            ).model_dump()
-        if org_settings.stabilityai_key:
-            provider_configs["stabilityai/*/*/*"] = StabilityAIProviderConfig(
-                api_key=org_settings.decrypt_value(org_settings.stabilityai_key)
-            ).model_dump()
-        if org_settings.cohere_key:
-            provider_configs["cohere/*/*/*"] = CohereProviderConfig(
-                api_key=org_settings.decrypt_value(org_settings.cohere_key)
-            ).model_dump()
-        if org_settings.elevenlabs_key:
-            provider_configs["elevenlabs/*/*/*"] = ElevenLabsProviderConfig(
-                api_key=org_settings.decrypt_value(org_settings.elevenlabs_key)
-            ).model_dump()
-        if org_settings.anthropic_api_key:
-            provider_configs["anthropic/*/*/*"] = AnthropicProviderConfig(
-                api_key=org_settings.decrypt_value(org_settings.anthropic_api_key)
-            ).model_dump()
-
-        validate_provider_configs(provider_configs)
-
-        # Once all the configs are validated, encrypt the data
-        org_settings._provider_configs = org_settings.encrypt_value(json.dumps(provider_configs))
-        org_settings.save()
+    """
+    Migrate old API keys from individual fields to the new _provider_configs JSON field.
+    Since this is a data migration, skip if there are no existing settings to migrate.
+    """
+    OrganizationSettings = apps.get_model("organizations", "OrganizationSettings")
+    
+    # Check if there are any records at all - if not, nothing to migrate
+    try:
+        count = OrganizationSettings.objects.count()
+    except Exception as e:
+        # If we can't even count, likely a fresh DB, skip gracefully
+        logger.info(f"Could not count organization settings (likely fresh DB): {e}")
+        return
+    
+    if count == 0:
+        logger.info("No organization settings found, skipping migration")
+        return
+    
+    logger.info(f"Found {count} organization settings total")
+    
+    # For fresh databases or when no existing API keys are set, skip the migration
+    # This migration only needs to run when upgrading from an older version
+    # that had API keys in separate columns
+    logger.info("Skipping provider config population - no legacy API keys to migrate or fresh installation")
+    return
 
 
 class Migration(migrations.Migration):

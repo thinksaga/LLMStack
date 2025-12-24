@@ -13,7 +13,8 @@ RUN cd /src/pyrnnoise && git submodule update --init && cmake -B build -DCMAKE_B
 RUN cp /src/pyrnnoise/build/librnnoise.so /usr/local/lib/python3.11/site-packages/
 
 # Add poetry to the image
-RUN pip install --no-cache-dir poetry
+RUN pip install --no-cache-dir --upgrade pip setuptools packaging
+RUN pip install --no-cache-dir poetry==1.8.3
 
 # Copy pyproject.toml and poetry.lock
 ADD pyproject.toml /pyproject.toml
@@ -21,9 +22,9 @@ ADD poetry.lock /poetry.lock
 
 # Install dependencies
 RUN poetry config virtualenvs.create false
-RUN poetry install --no-root --no-dev --no-interaction --only faiss
-RUN poetry install --no-root --no-dev --no-interaction --no-ansi
-RUN poetry install --only server --no-root --no-dev --no-interaction --no-ansi
+RUN poetry install --no-root --without dev --no-interaction --only faiss
+RUN poetry install --no-root --without dev --no-interaction --no-ansi
+RUN poetry install --only server --no-root --without dev --no-interaction --no-ansi
 
 # Download nltk and spacy data
 RUN mkdir -p /usr/local/share/nltk_data/tokenizers
@@ -69,8 +70,8 @@ RUN groupadd -r ${APP_USER} && useradd --no-log-init -r -g ${APP_USER} ${APP_USE
 # Install runtime dependencies
 RUN set -ex \
   && RUN_DEPS=" \
-  libpcre3 \
-  mime-support \
+  libpcre2-8-0 \
+  media-types \
   ffmpeg \
   postgresql-client \
   gstreamer1.0-libav \

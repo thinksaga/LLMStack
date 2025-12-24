@@ -42,17 +42,22 @@ SINGLESTORE_PIPELINE_DATA = {
 
 
 def add_legacy_pipeline_to_datasource_config(apps, schema_editor):
-    from llmstack.base.models import Profile, VectorstoreEmbeddingEndpoint
-    from llmstack.data.models import DataSource
-
+    # Use apps.get_model to get the historical model state
+    DataSource = apps.get_model("datasources", "DataSource")
+    Profile = apps.get_model("base", "DefaultProfile")
+    
     datasources = DataSource.objects.all()
     for datasource in datasources:
         pipeline_data = {**PIPELINE_DATA_WITHOUT_SRC}
-        type_slug = datasource.config.get("type_slug")
-        owner_profile = Profile.objects.get(user=datasource.owner)
-
-        if owner_profile.vectostore_embedding_endpoint == VectorstoreEmbeddingEndpoint.AZURE_OPEN_AI:
-            pipeline_data["embedding"]["data"]["embedding_provider_slug"] = "azure-openai"
+        type_slug = datasource.config.get("type_slug") if datasource.config else None
+        
+        try:
+            owner_profile = Profile.objects.get(user=datasource.owner)
+            # Check if the profile has the vectostore_embedding_endpoint attribute
+            if hasattr(owner_profile, 'vectostore_embedding_endpoint') and owner_profile.vectostore_embedding_endpoint == 1:  # 1 is AZURE_OPEN_AI enum value
+                pipeline_data["embedding"]["data"]["embedding_provider_slug"] = "azure-openai"
+        except Profile.DoesNotExist:
+            pass
 
         if type_slug and type_slug in ["pdf", "text", "url", "file"]:
             # Add src config
@@ -66,7 +71,7 @@ def add_legacy_pipeline_to_datasource_config(apps, schema_editor):
         else:
             continue
 
-        datasource_config = {**datasource.config} or {}
+        datasource_config = {**datasource.config} if datasource.config else {}
         datasource_config["pipeline"] = pipeline_data
         datasource.config = {**datasource_config}
         datasource.save()

@@ -40,7 +40,7 @@ rqworker() {
     python manage.py rqworker default sheets --verbosity=0 --with-scheduler
 }
 
-until pg_isready -h $DATABASE_HOST; do
+until pg_isready -h $DATABASE_HOST -U ${DATABASE_USERNAME:-postgres}; do
     >&2 echo "Postgres is unavailable - sleeping"
     sleep 1
 done
