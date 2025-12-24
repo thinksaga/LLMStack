@@ -48,6 +48,94 @@ Above commands will install and start LLMStack. It will create `.llmstack` in yo
 
 > You can add your own keys to providers like OpenAI, Cohere, Stability etc., from Settings page. If you want to provide default keys for all the users of your LLMStack instance, you can add them to the `~/.llmstack/config` file.
 
+### Development Setup
+
+For local development with Docker Compose:
+
+#### Prerequisites
+- Docker and Docker Compose
+- Node.js and npm (for client development)
+- Python 3.11+ (for backend development)
+
+#### Quick Start
+1. Clone the repository:
+```bash
+git clone https://github.com/thinksaga/LLMStack.git
+cd LLMStack
+```
+
+2. Start the development environment:
+```bash
+# Build and start all services
+docker compose -f docker/docker-compose.dev.yml --env-file docker/.env.dev up -d
+
+# Or use the Makefile shortcuts
+make api-image  # Build API image
+make app-image  # Build app image
+```
+
+3. Access the application:
+- **Frontend**: http://localhost:3000
+- **API**: http://localhost:9000
+- **Admin Panel**: http://localhost:3000/admin
+- **PostgreSQL**: localhost:25432
+- **Redis**: localhost:26379
+- **Weaviate**: localhost:28080
+
+#### Default Credentials
+- **Admin Username**: `admin`
+- **Admin Password**: `promptly`
+
+#### User Registration
+Self-service user registration is disabled. New users must be created by administrators through the Django admin panel at `/admin`.
+
+#### Troubleshooting
+
+**Common Issues and Solutions:**
+
+1. **Database Connection Issues**
+   - The API container uses `pg_isready` to check database connectivity
+   - If you see "role 'appuser' does not exist", the database user check failed
+   - Solution: Ensure PostgreSQL is running and the entrypoint script is using the correct database user
+
+2. **Nginx Configuration Errors**
+   - If the app container fails with "host not found in upstream", check nginx.conf
+   - The runner service is commented out in development, so remove runner references from nginx config
+
+3. **Migration Errors**
+   - Database migrations may fail with model lookup errors
+   - Ensure migrations use `apps.get_model()` for historical model references
+   - For fresh databases, migrations should handle missing data gracefully
+
+4. **Package Compatibility**
+   - Debian Trixie uses different package names (e.g., `libpcre2-8-0` instead of `libpcre3`)
+   - Poetry 1.8.3+ uses `--without` instead of `--no-dev`
+
+5. **Container Build Issues**
+   - Clear Docker cache: `docker system prune -a --volumes -f`
+   - Rebuild images: `make api-image && make app-image`
+
+**Services Status Check:**
+```bash
+# Check all containers
+docker ps
+
+# Check logs for specific service
+docker logs llmstack-dev-api-1
+docker logs llmstack-dev-app-1
+```
+
+**Database Management:**
+```bash
+# Access PostgreSQL
+docker exec -it llmstack-dev-postgres-1 psql -U postgres -d postgres
+
+# Reset database (removes all data)
+docker compose -f docker/docker-compose.dev.yml down
+docker volume rm llmstack-dev_postgresdata
+docker compose -f docker/docker-compose.dev.yml up -d
+```
+
 <div>
   <a href="https://www.tella.tv/video/clr16i2sl00000glahhue313b/embed?b=0&title=0&a=1&loop=0&autoPlay=true&t=0&muted=1">
     <p>LLMStack: Quickstart video</p>
